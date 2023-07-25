@@ -219,7 +219,7 @@ def fork_ssh(list_of_nodes:dict) -> None:
 
     reachable_nodes = { node : state 
         for node, state in list_of_nodes.items() 
-            if state[-1] not in suffixes }
+            if state[-1] not in suffixes and state[1:] not in 'd' }
 
     unreachable_nodes = { node : state 
         for node, state in list_of_nodes.items() 
@@ -227,12 +227,6 @@ def fork_ssh(list_of_nodes:dict) -> None:
 
     if len(unreachable_nodes): logger.info(piddly(f"{unreachable_nodes.keys()=}"))
 
-    for node, state in unreachable_nodes.items():
-        with open(DAT_FILE, 'a+') as infodat:
-            fcntl.lockf(infodat, fcntl.LOCK_EX)
-            infodat.write(f'{node} -1 -1\n')
-            infodat.close()
-        
     for node in reachable_nodes:            
 
         # Parent process records the child's PID.
@@ -386,7 +380,7 @@ def map_cores(stdscr: object) -> None:
                 help_panel.show()
                 #wrapper(help_window)
                 header = "Node".ljust(7)+"Cores"+padding(61)+"Memory\n"
-                subheader = padding(7) + "Allocated" + padding(45) +" Used " + padding(6) + "Alloc   Used    Total"
+                subheader = padding(7) + "Allocated" + padding(48) +" Used " + padding(3) + "Alloc   Used    Total"
                 help_win.addstr(0, 0, header, WHITE_AND_BLACK)
                 help_win.addstr(1, 0, subheader, WHITE_AND_BLACK)             
                 help_win.addstr(3, 0, "spdr01 [XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX______] 37.38      48      50      384", YELLOW_AND_BLACK)
@@ -413,7 +407,7 @@ def map_cores(stdscr: object) -> None:
             else:
 
                 header = "Node".ljust(7)+"Cores"+padding(61)+"Memory\n"
-                subheader = padding(7) + "Allocated" + padding(45) +" Used " + padding(6) + "Alloc   Used    Total"
+                subheader = padding(7) + "Allocated" + padding(48) +" Used " + padding(3) + "Alloc   Used    Total"
                 window2.addstr(0, 0, header, WHITE_AND_BLACK)
                 window2.addstr(1, 0, subheader, WHITE_AND_BLACK)            
 
