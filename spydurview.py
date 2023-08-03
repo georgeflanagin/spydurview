@@ -189,7 +189,7 @@ def get_info() -> dict:
                     if suffix: text = f"{text} and {suffixes.get('suffix', 'N/A')}"
                 core_map_and_mem.append(f"{node} is {text}.")
             else:
-                core_map_and_mem.append(f"{node} {alloc_cores} {used_cores.rjust(10)} {alloc_mem.rjust(6)}  {used_mem.rjust(6)}  {total_mem_formatted.rjust(6)} ")
+                core_map_and_mem.append(f"{node} {alloc_cores} {used_cores.rjust(10)} | {alloc_mem.rjust(6)}  {used_mem.rjust(6)}  {total_mem_formatted.rjust(6)} ")
                
         except Exception as e:
             logger.info(piddly(f"{e}"))
@@ -266,7 +266,7 @@ def fork_ssh(list_of_nodes:dict) -> None:
 @trap
 def how_busy(n:str) -> int:
     """
-    Returns 0-1, corresponding to the business of the node
+    Returns 0-n, corresponding to the activity on the node
     """
     data = SeekINFO()
     busy_cores = 0
@@ -379,8 +379,8 @@ def map_cores(stdscr: object) -> None:
                 left_panel.hide()
                 help_panel.show()
                 #wrapper(help_window)
-                header = "Node".ljust(7)+"Cores"+padding(61)+"Memory\n"
-                subheader = padding(7) + "Allocated" + padding(48) +" Used " + padding(3) + "Alloc   Used    Total"
+                header = "Node".ljust(7)+"Cores"+padding(61)+"| Memory\n"
+                subheader = padding(7) + "Allocated" + padding(48) +" Used " + padding(3) + "| Alloc   Used    Total"
                 help_win.addstr(0, 0, header, WHITE_AND_BLACK)
                 help_win.addstr(1, 0, subheader, WHITE_AND_BLACK)             
                 help_win.addstr(3, 0, "spdr01 [XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX______] 37.38      48      50      384", YELLOW_AND_BLACK)
@@ -406,8 +406,8 @@ def map_cores(stdscr: object) -> None:
 
             else:
 
-                header = "Node".ljust(7)+"Cores"+padding(61)+"Memory\n"
-                subheader = padding(7) + "Allocated" + padding(48) +" Used " + padding(3) + "Alloc   Used    Total"
+                header = "Node".ljust(7)+"Cores"+padding(61)+"| Memory\n"
+                subheader = padding(7) + "Allocated" + padding(48) +"Used " + padding(3) + " | Alloc   Used    Total"
                 window2.addstr(0, 0, header, WHITE_AND_BLACK)
                 window2.addstr(1, 0, subheader, WHITE_AND_BLACK)            
 
