@@ -96,7 +96,7 @@ def collectdata(host:str) -> int:
 
     except Exception as e:
         logger.error(piddly(f"{e}"))
-        return os.EX_SOFTWARE
+        return os.EX_UNAVAILABLE
 
     return os.EX_OK
 
@@ -109,120 +109,6 @@ def extract_pickle(file_name:str) -> object:
             except EOFError:
                 break
 
-@trap
-def get_actual_cores_usage(node:str) -> SloppyTree:
-    """
-    ssh to the node and get the number of cores that is actually used.
-    """
-    global logger
-    logger.info(piddly(f"get_actual_cores_usage for {node}"))
-    cmd = "ssh -o ConnectTimeout={} {} 'cat /proc/loadavg'"
-    return parse_loadavg(dorunrun(cmd.format(myargs.wait_sec, node), return_datatype = str))
-
-@trap 
-def get_actual_mem_usage(node:str) -> SloppyTree:
-    """
-    ssh to the node and calculate how much memory is used.
-    """
-    global logger
-    logger.info(piddly(f"get_actual_mem_usage for {node}"))
-    cmd = "ssh -o ConnectTimeout={} {} 'cat /proc/meminfo | head -3'"
-    return parse_meminfo(dorunrun(cmd.format(myargs.wait_sec, node), return_datatype = str))
-   
-@trap
-def get_actual_stats(node:str) -> SloppyTree:
-    """
-    ssh to the node and retrive mpstat info.
-    """
-    global logger
-    logger.info(piddly(f"get_actual_stats for {node}"))
-    cmd = "ssh -o ConnectTimeout={} {} 'mpstat | tail -2'"
-    return parse_mpstat(dorunrun(cmd.format(myargs.wait_sec, node), return_datatype=str))
-    
-@trap
-def get_hostnames() -> tuple:
-    """
-    Gets the current list of workstations.
-    """
-    global myargs, logger
-    logger.info("get_hostnames")
-    try:
-        hosts = tuple(_ for _ in fileutils.read_whitespace_file(myargs.input))
-    except Exception as e:
-        logger.error(f"Could not use {myargs.input} because {e}")
-        sys.exit(os.EX_DATAERR)
-    
-    if not len(hosts):
-        logger.error(f"No hosts found.")
-        sys.exit(os.EX_DATAERR)
-
-    return hosts
-
-    
-@trap
-def get_info() -> SloppyTree:
-    """
-    Build a tree of the information we gather from the workstations.
-    """
-    global logger, DAT_FILE
-    logger.info(piddly("Entered get_info"))
-
-    t = SloppyTree()
-    fork_ssh(get_hostnames())
-
-    for p in extract_pickle(DAT_FILE):
-        host, data_type, data_tree = p
-        t[host][data_type] = data_tree
-
-    return t
-
-@trap
-def parse_meminfo(s:str) -> SloppyTree:
-    """
-    Parse /proc/meminfo and return keys and values.
-    """
-    global logger
-    d = {}
-    for line in s.split('\n'):
-        label, value, _ = line.split()
-        try:
-            d[label[:-1].lower()] = int(value)
-        except Exception as e:
-            d[label[:-1].lower()] = -1729
-
-    return d
-
-
-@trap
-def parse_loadavg(s:str) -> SloppyTree:
-    """
-    Parse /proc/loadavg and return keys and values.
-    """
-    d = SloppyTree()
-
-    d.minute_1, d.minute_5, d.minute_15, threads, _ = s.split()
-    d.running_threads, d.total_threads = threads.split('/')
-    for k, v in d.items():
-        d[k] = float(v)
-
-    return d
-
-@trap
-def parse_mpstat(s:str) -> SloppyTree:
-    """
-    Make sense of the mpstat output, and return keys and values.
-    """
-
-    d = SloppyTree()
-    keys, values = s.split('\n')
-    keys = keys.split()
-    values = values.split()
-    for k, v in dict(zip(keys, values)).items():
-        if k.startswith('%'):
-            d[k[1:]]=v
-
-    return d
-    
 @trap
 def fork_ssh(list_of_nodes:tuple) -> None:
     '''
@@ -269,14 +155,192 @@ def fork_ssh(list_of_nodes:tuple) -> None:
 
 
 @trap
+def get_actual_cores_usage(node:str) -> SloppyTree:
+    """
+    ssh to the node and get the number of cores that is actually used.
+    """
+    global logger
+    logger.info(piddly(f"get_actual_cores_usage for {node}"))
+    cmd = "ssh -o ConnectTimeout={} {} 'cat /proc/loadavg'"
+    result = SloppyTree(dorunrun(cmd.format(myargs.wait_sec, node), return_datatype = dict))
+    if not result.OK:
+        logger.error(f"{node} did not respond.")
+        raise Exception(f"{node} did not respond.")
+     
+    return parse_loadavg(result.stdout)
+    
+
+@trap 
+def get_actual_mem_usage(node:str) -> SloppyTree:
+    """
+    ssh to the node and calculate how much memory is used.
+    """
+    global logger
+    logger.info(piddly(f"get_actual_mem_usage for {node}"))
+    cmd = "ssh -o ConnectTimeout={} {} 'cat /proc/meminfo | head -3'"
+    result = SloppyTree(dorunrun(cmd.format(myargs.wait_sec, node), return_datatype = dict))
+    if not result.OK:
+        logger.error(f"{node} did not respond.")
+        raise Exception(f"{node} did not respond.")
+    return parse_meminfo(result.stdout)
+   
+@trap
+def get_actual_stats(node:str) -> SloppyTree:
+    """
+    ssh to the node and retrive mpstat info.
+    """
+    global logger
+    logger.info(piddly(f"get_actual_stats for {node}"))
+    cmd = "ssh -o ConnectTimeout={} {} 'mpstat | tail -2'"
+    result = SloppyTree(dorunrun(cmd.format(myargs.wait_sec, node), return_datatype = dict))
+    if not result.OK:
+        logger.error(f"{node} did not respond.")
+        raise Exception(f"{node} did not respond.")
+    return parse_mpstat(result.stdout)
+    
+@trap
+def get_hostnames() -> tuple:
+    """
+    Gets the current list of workstations.
+    """
+    global myargs, logger
+    logger.info("get_hostnames")
+    try:
+        hosts = tuple(_ for _ in fileutils.read_whitespace_file(myargs.input))
+    except Exception as e:
+        logger.error(f"Could not use {myargs.input} because {e}")
+        sys.exit(os.EX_DATAERR)
+    
+    if not len(hosts):
+        logger.error(f"No hosts found.")
+        sys.exit(os.EX_DATAERR)
+
+    return hosts
+
+    
+@trap
+def get_info() -> SloppyTree:
+    """
+    Build a tree of the information we gather from the workstations.
+    """
+    global logger, DAT_FILE
+    logger.info(piddly("Entered get_info"))
+
+    t = SloppyTree()
+    fork_ssh(get_hostnames())
+
+    for p in extract_pickle(DAT_FILE):
+        host, data_type, data_tree = p
+        t[host][data_type] = data_tree
+
+    return t
+
+@trap
+def parse_meminfo(s:str) -> SloppyTree:
+    """
+    Parse /proc/meminfo and return keys and values.
+    """
+    
+    global logger
+    if not s: 
+        logger.info("Nothing to do for meminfo.")
+        return SloppyTree()
+
+    d = {}
+    for line in s.split('\n'):
+        label, value, _ = line.split()
+        try:
+            d[label[:-1].lower()] = int(value)
+        except Exception as e:
+            d[label[:-1].lower()] = -1729
+
+    return d
+
+
+@trap
+def parse_loadavg(s:str) -> SloppyTree:
+    """
+    Parse /proc/loadavg and return keys and values.
+    """
+    global logger
+    if not s: 
+        logger.info("Nothing to do for meminfo.")
+        return SloppyTree()
+
+    d = SloppyTree()
+
+    d.minute_1, d.minute_5, d.minute_15, threads, _ = s.split()
+    d.running_threads, d.total_threads = threads.split('/')
+    for k, v in d.items():
+        d[k] = float(v)
+
+    return d
+
+@trap
+def parse_mpstat(s:str) -> SloppyTree:
+    """
+    Make sense of the mpstat output, and return keys and values.
+    """
+    global logger
+    if not s: 
+        logger.info("Nothing to do for meminfo.")
+        return SloppyTree()
+
+
+    d = SloppyTree()
+    keys, values = s.split('\n')
+    keys = keys.split()
+    values = values.split()
+    for k, v in dict(zip(keys, values)).items():
+        if k.startswith('%'):
+            d[k[1:]]=v
+
+    return d
+    
+
+@trap
+def read_config(filename:str) -> SloppyTree:
+    """
+    Read the config information.
+    """
+    default_config = SloppyTree()
+    default_config.mem.memfree
+    default_config.mem.memavailable
+    default_config.stats.usr
+
+    global logger
+    lines=[]
+    try:
+        with open(filename) as f:
+            lines=f.readlines()
+    except Exception as e:
+        logger.info(f"Using default config data")
+        return default_config
+
+    root = SloppyTree()
+
+    for line in lines:
+        keys = line.split('.')
+        p = root
+        for k in keys:
+            p[k] ; p=p[k]
+
+    return root
+                
+
+
+@trap
 def wsview_main() -> int:
     #wrapper(draw_menu)
     global logger, myargs
     logger.info(piddly("Entered wsview_main"))
-    
+    config_data = read_config(myargs.conf) 
 
-    data = dict(get_info())
-    print(data)
+    data = get_info()
+    for row in data.tree_as_table():
+        print(row)
+    
+        
 
     return os.EX_OK
 
@@ -285,13 +349,14 @@ if __name__ == '__main__':
     
     this_prog = os.path.basename(__file__)[:-3]
     logfile = f"{this_prog}.log"
+    configfile = f"{this_prog}.conf"
     default_host_file = os.path.join(os.getcwd(), 'hosts')
 
     parser = argparse.ArgumentParser(prog="wsview", 
         description="What wsview does, wsview does best.")
 
-    parser.add_argument('-c', '--columns', type=str,
-        default="")
+    parser.add_argument('--conf', type=str, default=configfile, 
+        help=f"Name of a file describing what you want to report. Default is {configfile}")
     parser.add_argument('-i', '--input', type=str, default=default_host_file,
         help=f"A whitespace delimited file of [user@]host names. Default file is {default_host_file}")
     parser.add_argument('-o', '--output', type=str, default="",
