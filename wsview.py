@@ -63,51 +63,17 @@ __license__ = 'MIT'
 DAT_FILE=os.path.join(os.getcwd(), 'info.dat')
 
 @trap
-def append_pickle(o:object, file_name:str) -> int:
-    """
-    Append a pickle of o to file_name.
-    """
-    global logger
-    logger.info(piddly("append_pickle"))
-    with open(file_name, 'ab+') as f:
-        logger.info(piddly("Pickle file open, waiting for lock."))
-        fcntl.lockf(f, fcntl.LOCK_EX)
-        logger.info(piddly("locked."))
-        try:
-            pickle.dump(o, f)
-            logger.info(piddly("Pickle written."))
-        except pickle.PicklingError as e:
-            logger.error(piddly(f"{e}"))
-        finally:
-            f.close()
-
-
-@trap
 def collectdata(host:str) -> int:
     """
     This is the function executed by the child process.
     """
     global logger, DAT_FILE
     logger.info(piddly(f"Collecting data about {host}"))
-    try:
-        append_pickle([host, 'stats', get_actual_stats(host)], DAT_FILE)
-        append_pickle([host, 'mem', get_actual_mem_usage(host)], DAT_FILE)
-        append_pickle([host, 'cores', get_actual_cores_usage(host)], DAT_FILE)
-
-    except Exception as e:
-        logger.error(piddly(f"{e}"))
-        return os.EX_UNAVAILABLE
+    error = (fileutils.append_pickle([host, 'stats', get_actual_stats(host)], DAT_FILE) and
+        fileutils.append_pickle([host, 'mem', get_actual_mem_usage(host)], DAT_FILE) and
+        fileutils.append_pickle([host, 'cores', get_actual_cores_usage(host)], DAT_FILE))
 
     return os.EX_OK
-
-@trap
-def extract_pickle(file_name:str) -> object:
-    with open(file_name, 'rb') as f:
-        while True:
-            try:
-                yield pickle.load(f)
-            except EOFError:
-                break
 
 @trap
 def fork_ssh(list_of_nodes:tuple) -> None:
@@ -229,7 +195,7 @@ def get_info() -> SloppyTree:
     t = SloppyTree()
     fork_ssh(get_hostnames())
 
-    for p in extract_pickle(DAT_FILE):
+    for p in fileutils.extract_pickle(DAT_FILE):
         host, data_type, data_tree = p
         t[host][data_type] = data_tree
 
@@ -327,7 +293,6 @@ def read_config(filename:str) -> SloppyTree:
 
     return root
                 
-
 
 @trap
 def wsview_main() -> int:
